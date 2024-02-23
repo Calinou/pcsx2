@@ -2088,7 +2088,7 @@ void GSDevice11::RenderImGui()
 	m_ctx->IASetVertexBuffers(0, 1, m_vb.addressof(), &m_state.vb_stride, &vb_offset);
 }
 
-void GSDevice11::SetupDATE(GSTexture* rt, GSTexture* ds, const GSVertexPT1* vertices, bool datm)
+void GSDevice11::SetupDATE(GSTexture* rt, GSTexture* ds, const GSVertexPT1* vertices, u8 datm)
 {
 	// sfex3 (after the capcom logo), vf4 (first menu fading in), ffxii shadows, rumble roses shadows, persona4 shadows
 
@@ -2116,7 +2116,7 @@ void GSDevice11::SetupDATE(GSTexture* rt, GSTexture* ds, const GSVertexPT1* vert
 	// ps
 	PSSetShaderResource(0, rt);
 	PSSetSamplerState(m_convert.pt.get());
-	PSSetShader(m_convert.ps[static_cast<int>(datm ? ShaderConvert::DATM_1 : ShaderConvert::DATM_0)].get(), nullptr);
+	PSSetShader(m_convert.ps[SetDATMShader(datm)].get(), nullptr);
 
 	//
 

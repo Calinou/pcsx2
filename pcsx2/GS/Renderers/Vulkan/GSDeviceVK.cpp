@@ -50,7 +50,7 @@ static u32 s_debug_scope_depth = 0;
 
 static bool IsDATMConvertShader(ShaderConvert i)
 {
-	return (i == ShaderConvert::DATM_0 || i == ShaderConvert::DATM_1);
+	return (i == ShaderConvert::DATM_0 || i == ShaderConvert::DATM_1 || i == ShaderConvert::DATM_0_RTA_CORRECTION || i == ShaderConvert::DATM_1_RTA_CORRECTION);
 }
 static bool IsDATEModePrimIDInit(u32 flag)
 {
@@ -3929,6 +3929,8 @@ bool GSDeviceVK::CompileConvertPipelines()
 			break;
 			case ShaderConvert::DATM_0:
 			case ShaderConvert::DATM_1:
+			case ShaderConvert::DATM_0_RTA_CORRECTION:
+			case ShaderConvert::DATM_1_RTA_CORRECTION:
 			{
 				rp = m_date_setup_render_pass;
 			}
@@ -4030,10 +4032,11 @@ bool GSDeviceVK::CompileConvertPipelines()
 		}
 	}
 
-	for (u32 datm = 0; datm < 2; datm++)
+	for (u32 datm = 0; datm < 4; datm++)
 	{
+		const std::string entry_point(StringUtil::StdStringFromFormat("ps_stencil_image_init_%d", datm));
 		VkShaderModule ps =
-			GetUtilityFragmentShader(*shader, datm ? "ps_stencil_image_init_1" : "ps_stencil_image_init_0");
+			GetUtilityFragmentShader(*shader, entry_point.c_str());
 		if (ps == VK_NULL_HANDLE)
 			return false;
 
@@ -4055,7 +4058,7 @@ bool GSDeviceVK::CompileConvertPipelines()
 				return false;
 
 			Vulkan::SetObjectName(m_device, m_date_image_setup_pipelines[ds][datm],
-				"DATE image clear pipeline (ds=%u, datm=%u)", ds, datm);
+				"DATE image clear pipeline (ds=%u, datm=%u)", ds, (datm == 1 || datm == 3));
 		}
 	}
 
@@ -5440,7 +5443,7 @@ void GSDeviceVK::SetPSConstantBuffer(const GSHWDrawConfig::PSConstantBuffer& cb)
 		m_dirty_flags |= DIRTY_FLAG_PS_CONSTANT_BUFFER;
 }
 
-void GSDeviceVK::SetupDATE(GSTexture* rt, GSTexture* ds, bool datm, const GSVector4i& bbox)
+void GSDeviceVK::SetupDATE(GSTexture* rt, GSTexture* ds, u8 datm, const GSVector4i& bbox)
 {
 	GL_PUSH("SetupDATE {%d,%d} %dx%d", bbox.left, bbox.top, bbox.width(), bbox.height());
 
@@ -5459,7 +5462,7 @@ void GSDeviceVK::SetupDATE(GSTexture* rt, GSTexture* ds, bool datm, const GSVect
 	SetUtilityTexture(rt, m_point_sampler);
 	OMSetRenderTargets(nullptr, ds, bbox);
 	IASetVertexBuffer(vertices, sizeof(vertices[0]), 4);
-	SetPipeline(m_convert[static_cast<int>(datm ? ShaderConvert::DATM_1 : ShaderConvert::DATM_0)]);
+	SetPipeline(m_convert[SetDATMShader(datm)]);
 	BeginClearRenderPass(m_date_setup_render_pass, bbox, 0.0f, 0);
 	if (ApplyUtilityState())
 		DrawPrimitive();

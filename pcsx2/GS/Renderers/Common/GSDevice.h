@@ -19,6 +19,8 @@ enum class ShaderConvert
 	RGBA8_TO_16_BITS,
 	DATM_1,
 	DATM_0,
+	DATM_1_RTA_CORRECTION,
+	DATM_0_RTA_CORRECTION,
 	HDR_INIT,
 	HDR_RESOLVE,
 	RTA_CORRECTION,
@@ -43,6 +45,14 @@ enum class ShaderConvert
 	CLUT_8,
 	YUV,
 	Count
+};
+
+enum class SetDATM
+{
+	DATM0 = 0,
+	DATM1,
+	DATM0_RTA_CORRECTION,
+	DATM1_RTA_CORRECTION
 };
 
 enum class ShaderInterlace
@@ -80,6 +90,8 @@ static inline bool HasStencilOutput(ShaderConvert shader)
 	{
 		case ShaderConvert::DATM_0:
 		case ShaderConvert::DATM_1:
+		case ShaderConvert::DATM_0_RTA_CORRECTION:
+		case ShaderConvert::DATM_1_RTA_CORRECTION:
 			return true;
 		default:
 			return false;
@@ -652,7 +664,7 @@ struct alignas(16) GSHWDrawConfig
 	bool require_full_barrier; ///< Require texture barrier between all prims
 
 	DestinationAlphaMode destination_alpha;
-	bool datm : 1;
+	u8 datm : 2;
 	bool line_expand : 1;
 	bool separate_alpha_pass : 1;
 	bool second_separate_alpha_pass : 1;
@@ -904,6 +916,8 @@ public:
 	virtual void StretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, bool red, bool green, bool blue, bool alpha) = 0;
 
 	void StretchRect(GSTexture* sTex, GSTexture* dTex, const GSVector4& dRect, ShaderConvert shader = ShaderConvert::COPY, bool linear = true);
+
+	int SetDATMShader(u8& datm);
 
 	/// Performs a screen blit for display. If dTex is null, it assumes you are writing to the system framebuffer/swap chain.
 	virtual void PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, PresentShader shader, float shaderTime, bool linear) = 0;
