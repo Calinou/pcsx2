@@ -1993,6 +1993,9 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 					dst->m_was_dst_matched = true;
 					dst->m_TEX0.TBW = dst_match->m_TEX0.TBW;
 					dst->UpdateValidity(dst->m_valid);
+
+					dst->m_rt_alpha_scale = false;
+
 					if (!CopyRGBFromDepthToColor(dst, dst_match))
 					{
 						// Needed new texture and memory allocation failed.
@@ -2230,6 +2233,9 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 					}
 					else if (dst_match->m_texture->GetState() == GSTexture::State::Dirty)
 					{
+						if (dst_match->m_type == RenderTarget && dst_match->m_rt_alpha_scale)
+							dst_match->RTADecorrect(dst_match);
+
 						g_gs_device->StretchRect(dst_match->m_texture, sRect, dst->m_texture, dRect, shader, false);
 						g_perfmon.Put(GSPerfMon::TextureCopies, 1);
 					}
@@ -3684,6 +3690,19 @@ bool GSTextureCache::Move(u32 SBP, u32 SBW, u32 SPSM, int sx, int sy, u32 DBP, u
 	GL_CACHE("HW Move 0x%x[BW:%u PSM:%s] to 0x%x[BW:%u PSM:%s] <%d,%d->%d,%d> -> <%d,%d->%d,%d>", SBP, SBW,
 		psm_str(SPSM), DBP, DBW, psm_str(DPSM), sx, sy, sx + w, sy + h, dx, dy, dx + w, dy + h);
 
+	const bool cover_whole_target = dst->m_type == RenderTarget && GSVector4i(dx, dy, dx + w, dy + h).rintersect(dst->m_valid).eq(dst->m_valid);
+
+	if (!cover_whole_target)
+	{
+		if (src->m_type == RenderTarget && src->m_rt_alpha_scale)
+		{
+			src->RTADecorrect(src);
+		}
+		if (dst->m_type == RenderTarget && dst->m_rt_alpha_scale)
+		{
+			dst->RTADecorrect(dst);
+		}
+	}
 	// If the copies overlap, this is a validation error, so we need to copy to a temporary texture first.
 	if ((SBP == DBP) && !(GSVector4i(sx, sy, sx + w, sy + h).rintersect(GSVector4i(dx, dy, dx + w, dy + h))).rempty())
 	{
@@ -3792,6 +3811,9 @@ bool GSTextureCache::Move(u32 SBP, u32 SBW, u32 SPSM, int sx, int sy, u32 DBP, u
 	}
 	dst->UpdateValidity(GSVector4i(dx, dy, dx + w, dy + h));
 	dst->UpdateDrawn(GSVector4i(dx, dy, dx + w, dy + h));
+
+	if(cover_whole_target)
+		dst->m_rt_alpha_scale = src->m_rt_alpha_scale;
 	// Invalidate any sources that overlap with the target (since they're now stale).
 	InvalidateVideoMem(g_gs_renderer->m_mem.GetOffset(DBP, DBW, DPSM), GSVector4i(dx, dy, dx + w, dy + h), false);
 	return true;
@@ -3845,6 +3867,12 @@ bool GSTextureCache::ShuffleMove(u32 BP, u32 BW, u32 PSM, int sx, int sy, int dx
 	const bool write_rg = (diff_x < 0);
 
 	const GSVector4i bbox = write_rg ? GSVector4i(dx, dy, dx + w, dy + h) : GSVector4i(sx, sy, sx + w, sy + h);
+
+	if (tgt->m_rt_alpha_scale)
+	{
+		if (read_ba || write_rg)
+			tgt->RTADecorrect(tgt);
+	}
 
 	GSHWDrawConfig& config = GSRendererHW::GetInstance()->BeginHLEHardwareDraw(tgt->m_texture, nullptr, tgt->m_scale, tgt->m_texture, tgt->m_scale, bbox);
 	config.colormask.wrgba = (write_rg ? (1 | 2) : (4 | 8));
