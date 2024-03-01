@@ -5288,8 +5288,11 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 				}
 				else if (m_conf.colormask.wa)
 				{
-					if (m_cached_ctx.FRAME.FBMSK == 0x3FFF)
+					if (!(m_cached_ctx.FRAME.FBMSK & 0xFFFC0000))
+					{
 						rt->m_rt_alpha_scale = false;
+						m_conf.ps.rta_correction = 1;
+					}
 					else if (m_cached_ctx.FRAME.FBMSK & 0xFFFC0000)
 					{
 						rt->RTADecorrect(rt);
@@ -5306,15 +5309,18 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 				}
 			}
 			else if (rt->m_last_draw == s_n)
+			{
 				rt->m_rt_alpha_scale = false;
+				m_conf.ps.rta_correction = 1;
+			}
 			else
 			{
 				rt->RTADecorrect(rt);
 				m_conf.rt = rt->m_texture;
 			}
 		}
-		else
-			m_conf.ps.rta_correction = rt->m_rt_alpha_scale;
+
+		m_conf.ps.rta_correction = rt->m_rt_alpha_scale;
 	}
 
 	bool blending_alpha_pass = false;
